@@ -18,20 +18,18 @@ try:
     if "GOOGLE_API_KEY" in st.secrets:
         os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
     else:
-        st.error("⚠️ Missing Gemini Key in .streamlit/secrets.toml")
+        st.error("⚠️ Missing Gemini Key in Secrets.")
         st.stop()
         
     if "TAVILY_API_KEY" in st.secrets:
         os.environ["TAVILY_API_KEY"] = st.secrets["TAVILY_API_KEY"]
 except FileNotFoundError:
-    st.error("🚨 Secrets file not found! Please create .streamlit/secrets.toml")
+    st.error("🚨 Secrets file not found!")
     st.stop()
 
 # --- 2. SIDEBAR ---
 with st.sidebar:
-    st.header("📂 Secure Workspace")
-    st.markdown("✅ **Encryption:** Active")
-    st.markdown("✅ **Keys:** Loaded from Safe")
+    st.header("📊 Analytica Workspace")
     
     uploaded_file = st.file_uploader("Upload Data", type=["csv"])
     
@@ -39,7 +37,7 @@ with st.sidebar:
         file_path = "dataset.csv"
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
-        st.success("Data Encrypted & Loaded")
+        st.success("Dataset Loaded")
         df = pd.read_csv(file_path)
         st.dataframe(df.head(3))
 
@@ -61,16 +59,14 @@ def get_agent():
         except Exception as e:
             return f"Error: {e}"
 
-    # Only add search capability if the key was found
     tools = [python_analyst_tool]
     if "TAVILY_API_KEY" in os.environ:
         tools.append(TavilySearchResults(max_results=3))
 
-    # Using the model we confirmed works for you
+    # Using the Gemini 2.0 Flash model
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
     llm_with_tools = llm.bind_tools(tools)
 
-    # Use 'add_messages' to keep the entire history intact
     class AgentState(TypedDict):
         messages: Annotated[list, add_messages]
 
@@ -89,7 +85,6 @@ def get_agent():
             else:
                 output = "Error: Unknown tool."
             
-            # CRITICAL FIX: Return a ToolMessage object, not a dictionary
             results.append(ToolMessage(
                 tool_call_id=tool_call['id'],
                 content=str(output)
@@ -114,23 +109,26 @@ def get_agent():
 if "messages" not in st.session_state: st.session_state.messages = []
 app = get_agent()
 
-st.title("📊 Analytica: Enterprise Data Intelligence")
-st.caption("Powered by Gemini 2.0 Flash • Running Locally")
+st.title("📊 Analytica: Enterprise Intelligence")
 
-# Display Chat
+# Display Chat History
 for msg in st.session_state.messages:
     if isinstance(msg, HumanMessage):
         with st.chat_message("user"): st.write(msg.content)
     elif isinstance(msg, AIMessage):
         with st.chat_message("assistant"): 
             st.write(msg.content)
-            if "plot.png" in msg.content or os.path.exists("plot.png"):
-                 if os.path.getmtime("plot.png") > st.session_state.get('last_plot_time', 0):
-                    st.image("plot.png")
-                    st.session_state['last_plot_time'] = os.path.getmtime("plot.png")
+            
+            # 🛠️ CRASH FIX: Only check timestamp if file definitely exists
+            if os.path.exists("plot.png"):
+                 try:
+                     if os.path.getmtime("plot.png") > st.session_state.get('last_plot_time', 0):
+                        st.image("plot.png")
+                        st.session_state['last_plot_time'] = os.path.getmtime("plot.png")
+                 except OSError:
+                     pass
 
-# Input
-user_input = st.chat_input("Ask your question...")
+user_input = st.chat_input("Ask the agent...")
 
 if user_input:
     st.session_state.messages.append(HumanMessage(content=user_input))
@@ -140,13 +138,9 @@ if user_input:
         with st.spinner("Analyzing..."):
             prompt = user_input
             if uploaded_file: prompt += " (Data is in 'dataset.csv')"
-            
             inputs = {"messages": st.session_state.messages}
             final_state = app.invoke(inputs)
-            
-            # Get the very last response
             st.write(final_state["messages"][-1].content)
             
             if os.path.exists("plot.png"): st.image("plot.png")
-            
             st.session_state.messages = final_state["messages"]
