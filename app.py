@@ -20,26 +20,40 @@ try:
     else:
         st.error("⚠️ Missing Gemini Key in Secrets.")
         st.stop()
-        
     if "TAVILY_API_KEY" in st.secrets:
         os.environ["TAVILY_API_KEY"] = st.secrets["TAVILY_API_KEY"]
 except FileNotFoundError:
     st.error("🚨 Secrets file not found!")
     st.stop()
 
-# --- 2. SIDEBAR ---
+# --- 2. SIDEBAR & FILE HANDLING ---
 with st.sidebar:
     st.header("📊 Analytica Workspace")
     
+    # A. File Uploader
     uploaded_file = st.file_uploader("Upload Data", type=["csv"])
-    
     if uploaded_file:
         file_path = "dataset.csv"
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.success("Dataset Loaded")
-        df = pd.read_csv(file_path)
-        st.dataframe(df.head(3))
+    
+    st.divider()
+    
+    # B. THE DOWNLOAD ZONE (NEW!) 📥
+    st.subheader("📂 Agent Deliverables")
+    st.caption("Files created by the agent will appear here.")
+    
+    # Check the folder for any new files
+    for filename in os.listdir("."):
+        if filename.endswith((".csv", ".png", ".txt", ".pdf")) and filename not in ["dataset.csv", "requirements.txt", "app.py", "launcher.bat"]:
+            with open(filename, "rb") as f:
+                st.download_button(
+                    label=f"⬇️ Download {filename}",
+                    data=f,
+                    file_name=filename,
+                    mime="application/octet-stream"
+                )
 
 # --- 3. AGENT LOGIC ---
 @st.cache_resource
@@ -48,13 +62,11 @@ def get_agent():
     
     @tool
     def python_analyst_tool(code: str):
-        """Executes Python code to analyze data or plot charts.
-        ALWAYS save plots as 'plot.png'."""
+        """Executes Python code. 
+        Use this to analyze data, save CSVs, or save plots as 'plot.png'."""
         try:
             code = code.strip("`").replace("python", "")
             result = repl.run(code)
-            if os.path.exists("plot.png"):
-                return "Chart generated and saved as 'plot.png'."
             return f"Executed:\n{result}"
         except Exception as e:
             return f"Error: {e}"
@@ -63,7 +75,7 @@ def get_agent():
     if "TAVILY_API_KEY" in os.environ:
         tools.append(TavilySearchResults(max_results=3))
 
-    # Using the Gemini 2.0 Flash model
+    # Using Gemini 2.0 Flash
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
     llm_with_tools = llm.bind_tools(tools)
 
@@ -111,7 +123,6 @@ app = get_agent()
 
 st.title("📊 Analytica: Enterprise Intelligence")
 
-# Display Chat History
 for msg in st.session_state.messages:
     if isinstance(msg, HumanMessage):
         with st.chat_message("user"): st.write(msg.content)
@@ -119,7 +130,7 @@ for msg in st.session_state.messages:
         with st.chat_message("assistant"): 
             st.write(msg.content)
             
-            # 🛠️ CRASH FIX: Only check timestamp if file definitely exists
+            # Display Plot if it exists
             if os.path.exists("plot.png"):
                  try:
                      if os.path.getmtime("plot.png") > st.session_state.get('last_plot_time', 0):
@@ -135,13 +146,18 @@ if user_input:
     with st.chat_message("user"): st.write(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing..."):
+        with st.spinner("Analyzing & Saving Files..."):
             prompt = user_input
             if uploaded_file: prompt += " (Data is in 'dataset.csv')"
             inputs = {"messages": st.session_state.messages}
+            
+            # High recursion limit for complex tasks
             final_state = app.invoke(inputs, config={"recursion_limit": 100})
+            
             st.write(final_state["messages"][-1].content)
             
             if os.path.exists("plot.png"): st.image("plot.png")
             st.session_state.messages = final_state["messages"]
-
+            
+            # Force Sidebar Refresh to show new download buttons
+            st.rerun()
