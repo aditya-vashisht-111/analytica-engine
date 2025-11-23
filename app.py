@@ -139,8 +139,9 @@ if user_input:
             prompt = user_input
             if uploaded_file: prompt += " (Data is in 'dataset.csv')"
             inputs = {"messages": st.session_state.messages}
-            final_state = app.invoke(inputs)
+            final_state = app.invoke(inputs, config={"recursion_limit": 100})
             st.write(final_state["messages"][-1].content)
             
             if os.path.exists("plot.png"): st.image("plot.png")
             st.session_state.messages = final_state["messages"]
+
