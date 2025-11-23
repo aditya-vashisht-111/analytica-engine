@@ -1,0 +1,8 @@
+streamlit
+pandas
+langchain-google-genai
+langchain-experimental
+langchain-community
+tavily-python
+langgraph
+langchain-core
