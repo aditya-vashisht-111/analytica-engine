@@ -6,3 +6,5 @@ langchain-community
 tavily-python
 langgraph
 langchain-core
+matplotlib
+seaborn
