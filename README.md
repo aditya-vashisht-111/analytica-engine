@@ -1,3 +1,12 @@
+# ⚙️ Analytica Engine
+> **Your autonomous, local intelligence engine for secure data analysis.**
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
+![Streamlit](https://img.shields.io/badge/Streamlit-Run_Locally-FF4B4B?style=for-the-badge&logo=streamlit)
+![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange?style=for-the-badge)
+![Gemini](https://img.shields.io/badge/Core-Gemini_2.0_Flash-4285F4?style=for-the-badge&logo=google)
+
+---
 A **secure, local AI Data Analyst** that runs on your machine. It allows you to drag-and-drop CSV files, ask questions in plain English, and instantly get Python analysis and visualization charts. 
 
 Built with **Streamlit**, **LangGraph**, and **Google Gemini 2.0 Flash**.
